@@ -41,7 +41,7 @@ var tasks = map[string]Task{
 	},
 }
 
-func getAll(res http.ResponseWriter, req *http.Request) {
+func getTasks(res http.ResponseWriter, req *http.Request) {
 	resArr, err := json.Marshal(tasks)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
@@ -52,11 +52,11 @@ func getAll(res http.ResponseWriter, req *http.Request) {
 	res.Write(resArr)
 }
 
-func getById(res http.ResponseWriter, req *http.Request) {
+func getTask(res http.ResponseWriter, req *http.Request) {
 	id := chi.URLParam(req, "id")
 	task, ok := tasks[id]
 	if !ok {
-		http.Error(res, "Bad Request", http.StatusBadRequest)
+		http.Error(res, fmt.Sprintf("Task with ID = %s not found", id), http.StatusBadRequest)
 		return
 	}
 	resArr, err := json.Marshal(task)
@@ -81,7 +81,11 @@ func addTask(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if _,ok := tasks[task.ID]; ok {
+		http.Error(res, fmt.Sprintf("Task with ID = %s already exist", task.ID), http.StatusBadRequest)
+	} 
 	tasks[task.ID] = task
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	
 }
@@ -90,9 +94,10 @@ func deleteTask(res http.ResponseWriter, req *http.Request) {
 	id := chi.URLParam(req, "id")
 	_, ok := tasks[id]
 	if !ok {
-		http.Error(res, "400 Bad Request", http.StatusBadRequest)
+		http.Error(res, fmt.Sprintf("Task with ID = %s not found", id), http.StatusBadRequest)
 	}
 	delete(tasks, id)
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 }
 
@@ -101,8 +106,8 @@ func main() {
 	r := chi.NewRouter()
 
 	// здесь регистрируйте ваши обработчики
-	r.Get("/tasks", getAll)
-	r.Get("/tasks/{id}", getById)
+	r.Get("/tasks", getTasks)
+	r.Get("/tasks/{id}", getTask)
 
 	r.Post("/tasks", addTask)
 
