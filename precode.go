@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -28,7 +30,7 @@ var tasks = map[string]Task{
 	},
 	"2": {
 		ID:          "2",
-		Description: "Протестировать финальное задание с помощью Postmen",
+		Description: "Протестировать финальное задание с помощью Postman",
 		Note:        "Лучше это делать в процессе разработки, каждый раз, когда запускаешь сервер и проверяешь хендлер",
 		Applications: []string{
 			"VS Code",
@@ -39,14 +41,77 @@ var tasks = map[string]Task{
 	},
 }
 
-// Ниже напишите обработчики для каждого эндпоинта
-// ...
+func getTasks(res http.ResponseWriter, req *http.Request) {
+	resArr, err := json.Marshal(tasks)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(resArr)
+}
+
+func getTask(res http.ResponseWriter, req *http.Request) {
+	id := chi.URLParam(req, "id")
+	task, ok := tasks[id]
+	if !ok {
+		http.Error(res, fmt.Sprintf("Task with ID = %s not found", id), http.StatusBadRequest)
+		return
+	}
+	resArr, err := json.Marshal(task)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(resArr)
+}
+
+func addTask(res http.ResponseWriter, req *http.Request) {
+	var task Task
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _,ok := tasks[task.ID]; ok {
+		http.Error(res, fmt.Sprintf("Task with ID = %s already exist", task.ID), http.StatusBadRequest)
+	} 
+	tasks[task.ID] = task
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	
+}
+
+func deleteTask(res http.ResponseWriter, req *http.Request) {
+	id := chi.URLParam(req, "id")
+	_, ok := tasks[id]
+	if !ok {
+		http.Error(res, fmt.Sprintf("Task with ID = %s not found", id), http.StatusBadRequest)
+	}
+	delete(tasks, id)
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+}
+
 
 func main() {
 	r := chi.NewRouter()
 
 	// здесь регистрируйте ваши обработчики
-	// ...
+	r.Get("/tasks", getTasks)
+	r.Get("/tasks/{id}", getTask)
+
+	r.Post("/tasks", addTask)
+
+	r.Delete("/tasks/{id}", deleteTask)
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		fmt.Printf("Ошибка при запуске сервера: %s", err.Error())
